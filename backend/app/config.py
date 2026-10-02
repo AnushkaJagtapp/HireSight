@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     def validate_production(self) -> None:
         if not self.is_production:
             return
+        missing = []
         weak_secrets = {
             "dev-secret-change-me",
             "dev-local-secret-please-change",
