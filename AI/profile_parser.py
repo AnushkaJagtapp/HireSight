@@ -16,6 +16,12 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from groq import Groq
+try:
+    from model_config import get_groq_model
+except ImportError:
+    def get_groq_model() -> str:
+        return os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+
 
 
 @dataclass
@@ -148,10 +154,11 @@ def parse_resume(file_path: str) -> ResumeData:
     # Use AI to structure the resume
     client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": """You are a resume parser. Extract structured data from the resume text.
+    try:
+        response = client.chat.completions.create(
+            model=get_groq_model(),
+            messages=[
+                {"role": "system", "content": """You are a resume parser. Extract structured data from the resume text.
 Return ONLY valid JSON:
 {
   "skills": ["skill1", "skill2", ...],
@@ -161,16 +168,15 @@ Return ONLY valid JSON:
   "certifications": ["cert1", "cert2", ...],
   "total_years_experience": <float or null>
 }"""},
-            {"role": "user", "content": f"RESUME TEXT:\n{raw_text[:8000]}"},
-        ],
-        temperature=0.1,
-        max_tokens=1500,
-        response_format={"type": "json_object"},
-    )
-
-    try:
+                {"role": "user", "content": f"RESUME TEXT:\n{raw_text[:8000]}"},
+            ],
+            temperature=0.1,
+            max_tokens=2500,
+            response_format={"type": "json_object"},
+        )
         data = json.loads(response.choices[0].message.content.strip())
-    except json.JSONDecodeError:
+    except Exception as e:
+        print(f"[profile] ⚠ Resume parsing LLM failed ({e}), using raw text fallback")
         data = {}
 
     print(f"[profile] Resume parsed — {len(data.get('skills', []))} skills found")
@@ -329,10 +335,11 @@ def parse_linkedin(linkedin_input: str, raw_text: str = None) -> LinkedInData:
         # Parse provided text with AI
         client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": """Parse this LinkedIn profile text. Return ONLY valid JSON:
+        try:
+            response = client.chat.completions.create(
+                model=get_groq_model(),
+                messages=[
+                    {"role": "system", "content": """Parse this LinkedIn profile text. Return ONLY valid JSON:
 {
   "headline": "<professional headline>",
   "summary": "<about section>",
@@ -340,16 +347,15 @@ def parse_linkedin(linkedin_input: str, raw_text: str = None) -> LinkedInData:
   "skills": ["skill1", "skill2"],
   "education": [{"institution": "", "degree": "", "field": ""}]
 }"""},
-                {"role": "user", "content": f"LINKEDIN PROFILE:\n{raw_text[:6000]}"},
-            ],
-            temperature=0.1,
-            max_tokens=1500,
-            response_format={"type": "json_object"},
-        )
-
-        try:
+                    {"role": "user", "content": f"LINKEDIN PROFILE:\n{raw_text[:6000]}"},
+                ],
+                temperature=0.1,
+                max_tokens=2500,
+                response_format={"type": "json_object"},
+            )
             data = json.loads(response.choices[0].message.content.strip())
-        except json.JSONDecodeError:
+        except Exception as e:
+            print(f"[profile] ⚠ LinkedIn parsing LLM failed ({e}), using empty structure")
             data = {}
 
         print(f"[profile] LinkedIn parsed — {len(data.get('skills', []))} skills found")
@@ -422,10 +428,11 @@ def synthesize_profile(
     # AI synthesis
     print("[profile] Synthesizing unified candidate profile...")
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": """You are a candidate profile analyst.
+    try:
+        response = client.chat.completions.create(
+            model=get_groq_model(),
+            messages=[
+                {"role": "system", "content": """You are a candidate profile analyst.
 Analyze the provided profile data from multiple sources (resume, GitHub, LinkedIn).
 Create a unified summary and identify any discrepancies.
 
@@ -439,17 +446,20 @@ Return ONLY valid JSON:
     "<experience inconsistency>"
   ]
 }"""},
-            {"role": "user", "content": combined_text},
-        ],
-        temperature=0.2,
-        max_tokens=1000,
-        response_format={"type": "json_object"},
-    )
-
-    try:
+                {"role": "user", "content": combined_text},
+            ],
+            temperature=0.2,
+            max_tokens=2500,
+            response_format={"type": "json_object"},
+        )
         data = json.loads(response.choices[0].message.content.strip())
-    except json.JSONDecodeError:
-        data = {}
+    except Exception as e:
+        print(f"[profile] ⚠ Profile synthesis LLM failed ({e}), using default summary")
+        data = {
+            "synthesized_summary": "Candidate profile synthesized from available documents.",
+            "claimed_experience": "Profile experience extracted.",
+            "verification_notes": []
+        }
 
     print(f"[profile] Profile synthesized — {len(all_skills)} total skills across sources")
 

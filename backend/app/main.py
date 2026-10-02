@@ -6,10 +6,13 @@ try:
 except Exception:
     pass
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
 from .config import settings
+from .limiter import limiter
 from .firebase import init_firebase
 from .routes import auth, users, interviews, jobs, progress, history
 
@@ -18,6 +21,21 @@ app = FastAPI(
     description="Backend for the AI-powered interview coach.",
     version="1.0.0",
 )
+
+app.state.limiter = limiter
+
+
+def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": f"Rate limit exceeded: {exc.detail}. Please wait before retrying.",
+            "error": str(exc.detail),
+        },
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 # FRONTEND_ORIGIN can be a single URL or a comma-separated list, so one deployed
 # backend can serve both the production Vercel domain and preview deployments.

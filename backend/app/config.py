@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
 
     GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
 
     FIREBASE_CREDENTIALS: str = "./firebase-service-account.json"
     FIREBASE_CREDENTIALS_JSON: str = ""
@@ -27,9 +28,13 @@ class Settings(BaseSettings):
     def validate_production(self) -> None:
         if not self.is_production:
             return
-        missing = []
-        if self.SECRET_KEY == "dev-secret-change-me" or len(self.SECRET_KEY) < 32:
-            missing.append("SECRET_KEY (minimum 32 characters)")
+        weak_secrets = {
+            "dev-secret-change-me",
+            "dev-local-secret-please-change",
+            "replace-with-at-least-32-random-characters",
+        }
+        if self.SECRET_KEY in weak_secrets or len(self.SECRET_KEY) < 32:
+            missing.append("SECRET_KEY (must be strong and at least 32 characters)")
         if not self.GROQ_API_KEY:
             missing.append("GROQ_API_KEY")
         if not self.FIREBASE_CREDENTIALS_JSON:

@@ -10,11 +10,22 @@ const UploadTab = ({ icon: Icon, label, active, onClick }) => (
   </button>
 );
 
+const SAMPLE_TRANSCRIPT = `Interviewer: Tell me about a time you designed a high-throughput, fault-tolerant distributed system.
+
+Candidate: In my previous role as a senior backend engineer, I architected our core payment ledger ingestion engine processing over 15,000 requests per second. Our primary engineering challenge was enforcing strict idempotency and zero duplicate charges during sudden traffic surges.
+
+I implemented an admission gateway with distributed Redis locks using short token leases, combined with PostgreSQL transaction boundaries enforcing unique constraints on the idempotency key. If a client retried a request within 24 hours, the gateway safely returned the cached response without re-executing business logic. Under Black Friday peak load, this maintained P99 latency under 45ms and achieved zero balance inconsistencies.
+
+Interviewer: How did you validate resilience against network partitions or Redis node crashes?
+
+Candidate: We ran automated Chaos Engineering game days with Chaos Mesh in our staging Kubernetes cluster. When Redis crashed, the service failed over directly to database optimistic locking with row versioning, ensuring business continuity without data corruption.`;
+
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
   const [tab, setTab] = useState('upload');
   const [uploadFile, setUploadFile] = useState(null);
   const [recordedFile, setRecordedFile] = useState(null);
+  const [transcriptText, setTranscriptText] = useState('');
   const [zoomLink, setZoomLink] = useState('');
   const [jd, setJd] = useState('');
   const [role, setRole] = useState('Software Engineer');
@@ -212,17 +223,35 @@ const Dashboard = ({ user }) => {
       return;
     }
 
-    const file = tab === 'record' ? recordedFile : uploadFile;
-    if (!validateMediaFile(file, tab === 'record' ? 'recording' : 'file selected')) return;
-    if (tab === 'record' && recElapsed < 5) {
-      showError('Recording is too short', 'Record at least 5 seconds of clear interview speech before analysis.');
-      return;
+    let file = null;
+    let transcriptPayload = null;
+
+    if (tab === 'transcript') {
+      const text = transcriptText.trim();
+      if (!text) {
+        showError('No transcript provided', 'Paste your interview transcript or Q&A dialogue before starting analysis.');
+        return;
+      }
+      if (text.split(/\s+/).filter(Boolean).length < 15) {
+        showError('Transcript is too short', 'Please provide a transcript of at least 15 words so the AI can evaluate your answers.');
+        return;
+      }
+      transcriptPayload = text;
+    } else {
+      file = tab === 'record' ? recordedFile : uploadFile;
+      if (!validateMediaFile(file, tab === 'record' ? 'recording' : 'file selected')) return;
+      if (tab === 'record' && recElapsed < 5) {
+        showError('Recording is too short', 'Record at least 5 seconds of clear interview speech before analysis.');
+        return;
+      }
     }
+
     clearError();
     setLoading(true);
     try {
       const res = await submitInterview({
         file,
+        transcript_text: transcriptPayload,
         job_description: jd,
         job_title: role,
         company_name: company,
@@ -239,7 +268,8 @@ const Dashboard = ({ user }) => {
             return;
           }
           if (data.status === 'failed') {
-            const [title, message] = formatAnalysisError(data.error, tab === 'record' ? 'Recorded audio' : 'Uploaded file');
+            const sourceLabel = tab === 'transcript' ? 'Transcript text' : (tab === 'record' ? 'Recorded audio' : 'Uploaded file');
+            const [title, message] = formatAnalysisError(data.error, sourceLabel);
             showError(title, message);
             setLoading(false);
             return;
@@ -257,7 +287,8 @@ const Dashboard = ({ user }) => {
       };
       setTimeout(poll, 3000);
     } catch (err) {
-      const [title, message] = formatAnalysisError(err?.response?.data?.detail || err.message, tab === 'record' ? 'Recorded audio' : 'File upload');
+      const sourceLabel = tab === 'transcript' ? 'Transcript text' : (tab === 'record' ? 'Recorded audio' : 'File upload');
+      const [title, message] = formatAnalysisError(err?.response?.data?.detail || err.message, sourceLabel);
       showError(title, message);
       setLoading(false);
     }
@@ -313,6 +344,7 @@ const Dashboard = ({ user }) => {
           <div className="flex gap-2 flex-wrap">
             <UploadTab icon={Upload} label="Upload File" active={tab==='upload'} onClick={()=>switchTab('upload')} />
             <UploadTab icon={Mic} label="Record Audio" active={tab==='record'} onClick={()=>switchTab('record')} />
+            <UploadTab icon={FileText} label="Paste Transcript" active={tab==='transcript'} onClick={()=>switchTab('transcript')} />
             <UploadTab icon={LinkIcon} label="Zoom Link" active={tab==='zoom'} onClick={()=>switchTab('zoom')} />
           </div>
 
@@ -418,6 +450,63 @@ const Dashboard = ({ user }) => {
                 )}
               </motion.div>
             )}
+            {tab === 'transcript' && (
+              <motion.div key="transcript" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-textMain text-sm font-semibold">Paste Interview Transcript</p>
+                    <p className="text-textMuted text-xs">Enter candidate responses or full interviewer dialogue for instant AI evaluation.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setTranscriptText(SAMPLE_TRANSCRIPT); clearError(); }}
+                      className="px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors flex items-center gap-1 border border-primary/20"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Load Sample
+                    </button>
+                    {transcriptText && (
+                      <button
+                        type="button"
+                        onClick={() => { setTranscriptText(''); clearError(); }}
+                        className="px-2 py-1 text-xs text-textMuted hover:text-textMain rounded-lg transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <textarea
+                    id="transcript-paste-input"
+                    rows={8}
+                    value={transcriptText}
+                    onChange={(e) => {
+                      setTranscriptText(e.target.value);
+                      if (error) clearError();
+                    }}
+                    placeholder={`Paste your interview transcript or Q&A dialogue here...\n\nExample:\nInterviewer: Tell me about a time you optimized database performance.\nCandidate: In my previous role at Stripe, I resolved query bottlenecks by creating composite indexes on high-cardinality foreign keys...`}
+                    className="input-field w-full p-3.5 text-sm font-mono leading-relaxed resize-y min-h-[160px] max-h-[420px] rounded-xl border border-black/15 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-textMuted/60"
+                  />
+                  <div className="flex items-center justify-between text-xs text-textMuted px-1 pt-1.5">
+                    <span>
+                      {transcriptText.trim() ? (
+                        <span className="text-primary font-medium">
+                          {transcriptText.trim().split(/\s+/).filter(Boolean).length} words · {transcriptText.length} chars
+                        </span>
+                      ) : (
+                        'Minimum 15 words recommended for accurate scoring'
+                      )}
+                    </span>
+                    <span className="text-[11px] text-textMuted/70">
+                      Supports direct text from Zoom, Google Meet, or typed notes
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
             {tab === 'zoom' && (
               <motion.div key="zoom" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}>
                 <input className="input-field" placeholder="Paste your Zoom cloud recording link here..." value={zoomLink} onChange={e=>setZoomLink(e.target.value)} />
@@ -472,8 +561,22 @@ const Dashboard = ({ user }) => {
               <p className="text-sm mt-1" style={{color:'#b91c1c'}}>{error.message}</p>
             </div>
           )}
-          <button onClick={handleAnalyze} className="btn-primary w-full flex items-center justify-center gap-2 py-3.5">
-            <Sparkles className="w-5 h-5" /> Analyze Interview
+          <button
+            onClick={handleAnalyze}
+            disabled={loading}
+            className="btn-primary w-full flex items-center justify-center gap-2 py-3.5 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+          >
+            {loading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Analyzing {tab === 'transcript' ? 'Transcript' : 'Interview'}…</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5" />
+                <span>Analyze {tab === 'transcript' ? 'Transcript' : 'Interview'}</span>
+              </>
+            )}
           </button>
         </motion.div>
 

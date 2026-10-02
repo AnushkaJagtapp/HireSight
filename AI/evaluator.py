@@ -9,6 +9,12 @@ import json
 from dataclasses import dataclass
 from typing import List
 from groq import Groq
+try:
+    from model_config import get_groq_model
+except ImportError:
+    def get_groq_model() -> str:
+        return os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+
 
 
 @dataclass
@@ -73,25 +79,23 @@ def evaluate(transcript: str, question: str = None) -> EvalResult:
         user_content += f"INTERVIEW QUESTION:\n{question}\n\n"
     user_content += f"CANDIDATE TRANSCRIPT:\n{transcript}"
 
-    print("[evaluator] Scoring quality + confidence via Llama 3.3 70B...")
-
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": EVAL_SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-        temperature=0.2,
-        max_tokens=800,
-        response_format={"type": "json_object"},
-    )
-
-    raw = response.choices[0].message.content.strip()
+    print(f"[evaluator] Scoring quality + confidence via {get_groq_model()}...")
 
     try:
+        response = client.chat.completions.create(
+            model=get_groq_model(),
+            messages=[
+                {"role": "system", "content": EVAL_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.2,
+            max_tokens=2000,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
         data = json.loads(raw)
-    except json.JSONDecodeError:
-        # Fallback defaults
+    except Exception as e:
+        print(f"[evaluator] ⚠ Evaluator call failed ({e}), using default fallback scores")
         data = {
             "clarity": 5, "depth": 5, "relevance": 5,
             "structure": 5, "conciseness": 5, "confidence": 5,

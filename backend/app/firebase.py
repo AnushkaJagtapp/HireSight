@@ -34,6 +34,12 @@ def init_firebase():
     else:
         cred_path = settings.FIREBASE_CREDENTIALS
         if not os.path.exists(cred_path):
+            if not settings.is_production:
+                print(f"[firebase] Warning: {cred_path} not found. Falling back to LocalDB.")
+                if _db is None:
+                    _db = LocalDB(settings.LOCAL_DB_PATH)
+                _bucket = None
+                return
             raise FileNotFoundError(
                 f"Firebase credentials missing. Set FIREBASE_CREDENTIALS_JSON (env) "
                 f"or provide a file at {cred_path}."

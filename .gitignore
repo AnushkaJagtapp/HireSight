@@ -4,10 +4,23 @@
 !**/.env.example
 .env.local
 .env.*.local
-**/*firebase-adminsdk*.json
-**/*service-account*.json
 *.pem
 *.key
+
+# Firebase & GCP Service Account credentials
+*firebase*.json
+**/*firebase*.json
+*firebase-adminsdk*.json
+**/*firebase-adminsdk*.json
+*service-account*.json
+**/*service-account*.json
+firebase-service-account.json
+**/firebase-service-account.json
+hiresight-*.json
+**/*hiresight*.json
+*.credentials.json
+**/*.credentials.json
+*secret*.json
 
 # Python
 __pycache__/

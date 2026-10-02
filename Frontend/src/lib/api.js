@@ -11,11 +11,23 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401, clear session
+import {
+  MOCK_DEMO_TOKEN,
+  MOCK_DEMO_USER,
+  MOCK_DEMO_INTERVIEW,
+  MOCK_DEMO_DASHBOARD,
+  MOCK_DEMO_ROADMAP,
+} from './mockDemo';
+
+export const isDemoToken = (token) =>
+  token === MOCK_DEMO_TOKEN || (typeof token === 'string' && token.startsWith('demo-'));
+
+// On 401, clear session (unless in mock demo mode)
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err?.response?.status === 401) {
+    const token = localStorage.getItem('hs_token');
+    if (err?.response?.status === 401 && !isDemoToken(token)) {
       localStorage.removeItem('hs_token');
       localStorage.removeItem('hs_user');
     }
@@ -28,7 +40,28 @@ export default api;
 // ── Auth ──
 export const signup = (data) => api.post('/api/auth/signup', data).then(r => r.data);
 export const login = (data) => api.post('/api/auth/login', data).then(r => r.data);
-export const getMe = () => api.get('/api/auth/me').then(r => r.data);
+export const getMe = () => {
+  const token = localStorage.getItem('hs_token');
+  return api.get('/api/auth/me').then(r => r.data).catch(err => {
+    if (isDemoToken(token)) return MOCK_DEMO_USER;
+    throw err;
+  });
+};
+
+export const demoLogin = async () => {
+  try {
+    const res = await api.post('/api/auth/demo');
+    if (res?.data?.access_token) {
+      return res.data;
+    }
+  } catch (err) {
+    console.warn('[demoLogin] Backend demo auth unavailable, using mock session fallback:', err?.message);
+  }
+  return {
+    access_token: MOCK_DEMO_TOKEN,
+    user: MOCK_DEMO_USER,
+  };
+};
 
 export const saveSession = ({ access_token, user }) => {
   localStorage.setItem('hs_token', access_token);
@@ -63,16 +96,57 @@ export const submitInterview = ({ file, transcript_text, job_description, job_ti
   fd.append('company_name', company_name || '');
   return api.post('/api/interviews/', fd).then(r => r.data);
 };
-export const listInterviews = () => api.get('/api/interviews/').then(r => r.data);
-export const getInterview = (id) => api.get(`/api/interviews/${id}`).then(r => r.data);
+export const listInterviews = () => {
+  const token = localStorage.getItem('hs_token');
+  return api.get('/api/interviews/').then(r => r.data).catch(err => {
+    if (isDemoToken(token)) return [MOCK_DEMO_INTERVIEW];
+    throw err;
+  });
+};
+export const getInterview = (id) => {
+  const token = localStorage.getItem('hs_token');
+  return api.get(`/api/interviews/${id}`).then(r => r.data).catch(err => {
+    if (isDemoToken(token)) return MOCK_DEMO_INTERVIEW;
+    throw err;
+  });
+};
 
 // ── Dashboard / Progress / Jobs / Coach / Roadmap ──
-export const getDashboard = () => api.get('/api/dashboard').then(r => r.data);
-export const getProgress = () => api.get('/api/progress').then(r => r.data);
+export const getDashboard = () => {
+  const token = localStorage.getItem('hs_token');
+  return api.get('/api/dashboard').then(r => r.data).catch(err => {
+    if (isDemoToken(token)) return MOCK_DEMO_DASHBOARD;
+    throw err;
+  });
+};
+export const getProgress = () => {
+  const token = localStorage.getItem('hs_token');
+  return api.get('/api/progress').then(r => r.data).catch(err => {
+    if (isDemoToken(token)) {
+      return {
+        series: [{ date: '2026-10-01', score: 89 }],
+        category_averages: { public_speaking: 27, answer_quality: 36, consistency_truthfulness: 18, filler_word_assessment: 8 },
+        total: 1,
+      };
+    }
+    throw err;
+  });
+};
 export const getJobs = () => api.get('/api/jobs').then(r => r.data);
-export const getCoach = () => api.get('/api/coach').then(r => r.data);
-export const getRoadmap = (days) =>
-  api.get('/api/roadmap', { params: days ? { days } : {} }).then(r => r.data);
+export const getCoach = () => {
+  const token = localStorage.getItem('hs_token');
+  return api.get('/api/coach').then(r => r.data).catch(err => {
+    if (isDemoToken(token)) return MOCK_DEMO_INTERVIEW.coaching;
+    throw err;
+  });
+};
+export const getRoadmap = (days) => {
+  const token = localStorage.getItem('hs_token');
+  return api.get('/api/roadmap', { params: days ? { days } : {} }).then(r => r.data).catch(err => {
+    if (isDemoToken(token)) return MOCK_DEMO_ROADMAP;
+    throw err;
+  });
+};
 export const saveRoadmapPreferences = (days) =>
   api.post('/api/roadmap/preferences', { days }).then(r => r.data);
 export const postCoachChat = ({ message, history }) =>

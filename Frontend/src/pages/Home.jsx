@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, CheckCircle2, Play, Star } from 'lucide-react';
+import { demoLogin, saveSession } from '../lib/api';
 
 import HeroDebriefPreview from '../components/home/HeroDebriefPreview';
 import InteractiveDebriefSimulator from '../components/home/InteractiveDebriefSimulator';
@@ -56,14 +57,15 @@ const Home = ({ onLogin }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const startDemo = (path = '/dashboard') => {
-    if (onLogin) {
-      onLogin({
-        name: 'Alex Chen',
-        email: 'alex.chen@hiresight.ai',
-        role: 'Senior Fullstack Engineer',
-        company: 'Stripe Candidate',
-      });
+  const startDemo = async (path = '/dashboard') => {
+    try {
+      const session = await demoLogin();
+      saveSession(session);
+      if (onLogin) {
+        onLogin(session.user);
+      }
+    } catch (err) {
+      console.warn('Demo login issue:', err);
     }
     navigate(path);
   };

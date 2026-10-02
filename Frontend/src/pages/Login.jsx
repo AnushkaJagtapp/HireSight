@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ArrowRight, User, Mail, Lock, Briefcase, GraduationCap, Github, Linkedin, SkipForward } from 'lucide-react';
-import { login as apiLogin, signup as apiSignup, saveSession, updateProfile } from '../lib/api';
+import { login as apiLogin, signup as apiSignup, demoLogin, saveSession, updateProfile } from '../lib/api';
 
 const Login = ({ onLogin }) => {
   const [isSignup, setIsSignup] = useState(false);
@@ -244,6 +244,34 @@ const Login = ({ onLogin }) => {
               ) : (
                 <>{isSignup ? 'Create Account' : 'Sign In'} <ArrowRight className="w-4 h-4" /></>
               )}
+            </button>
+
+            <div className="relative flex py-2 items-center my-1">
+              <div className="flex-grow border-t border-black/10"></div>
+              <span className="flex-shrink mx-4 text-xs font-semibold text-textMuted uppercase tracking-wider">or</span>
+              <div className="flex-grow border-t border-black/10"></div>
+            </div>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={async () => {
+                setError('');
+                setLoading(true);
+                try {
+                  const session = await demoLogin();
+                  saveSession(session);
+                  onLogin(session.user);
+                  navigate('/dashboard');
+                } catch (err) {
+                  setError('Failed to enter demo mode. Please retry.');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-black/15 bg-surface hover:bg-surfaceHigh text-textMain text-sm font-semibold transition-all hover:border-primary/40 shadow-sm"
+            >
+              <span>⚡ Explore Live Demo Account</span>
             </button>
           </form>
           )}

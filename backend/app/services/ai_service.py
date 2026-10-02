@@ -1,9 +1,12 @@
 """Wrap the AI interview evaluation pipeline."""
 import json
+import logging
 import os
 import re
 import sys
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Make the AI/ folder importable
 _AI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "AI"))
@@ -27,13 +30,36 @@ if not os.environ.get("GROQ_API_KEY"):
         pass
 
 
-_GROQ_MODEL = "llama-3.3-70b-versatile"
+try:
+    from model_config import get_groq_model
+    _GROQ_MODEL = get_groq_model()
+except Exception:
+    _GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+
+
+def _sync_env_keys() -> None:
+    """Reload environment variables from .env so newly updated API keys take effect immediately."""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+    except Exception:
+        pass
+    key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not key or key == "your_groq_api_key_here":
+        try:
+            from ..config import settings as _settings  # type: ignore
+            candidate = getattr(_settings, "GROQ_API_KEY", "").strip()
+            if candidate and candidate != "your_groq_api_key_here":
+                os.environ["GROQ_API_KEY"] = candidate
+        except Exception:
+            pass
 
 
 def _get_groq_client():
     """Lazy-create a Groq client using the same key the pipeline uses."""
+    _sync_env_keys()
     from groq import Groq
-    return Groq(api_key=os.environ["GROQ_API_KEY"])
+    return Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
 
 def _grade_for_score(score: float) -> str:
@@ -50,10 +76,12 @@ def _is_groq_service_error(exc: Exception) -> bool:
     message = str(exc).lower()
     status = getattr(exc, "status_code", None)
     markers = ("invalid_api_key", "invalid api key", "groq_api_key",
-               "authentication", "rate limit", "connection")
-    return status in {401, 403, 429, 500, 502, 503, 504} or any(
+               "authentication", "rate limit", "connection", "model_not_found",
+               "does not exist or you do not have access")
+    return status in {401, 403, 404, 429, 500, 502, 503, 504} or any(
         marker in message for marker in markers
     )
+
 
 
 def _validate_interview_transcript(transcript: str) -> None:
@@ -184,6 +212,7 @@ def run_pipeline(
     transcript_text: Optional[str] = None,
 ) -> dict:
     """Run the full evaluation pipeline and return a serializable report dict."""
+    _sync_env_keys()
     from pipeline_v2 import evaluate_interview  # lazy import
 
     try:
@@ -635,28 +664,31 @@ def coach_chat(report: dict, history: List[dict], message: str) -> str:
             model=_GROQ_MODEL,
             messages=messages,
             temperature=0.2,
-            max_tokens=140,
+            max_tokens=300,
         )
         raw = (response.choices[0].message.content or "").strip()
-        return _enforce_bullet_format(raw, message)
+        logger.info("[Coach Chat] Raw LLM output: %s", raw)
+        print(f"[Coach Chat] Raw LLM output: {raw}")
+        reply = _enforce_bullet_format(raw, message)
+        logger.info("[Coach Chat] Formatted reply: %s", reply)
+        return reply
     except Exception as e:
+        logger.error("[Coach Chat] Exception occurred during chat: %s", e, exc_info=True)
         return f"Coach is temporarily unavailable ({type(e).__name__}). Please try again in a moment."
 
 
 _PREAMBLE_PATTERNS = (
     "sure thing",
     "sure!",
+    "sure,",
     "of course",
     "great question",
     "good question",
     "absolutely",
     "let me help",
-    "here are",
-    "here's",
-    "based on your",
-    "to answer",
-    "i'd say",
-    "i would say",
+    "glad to help",
+    "happy to help",
+    "certainly",
 )
 
 
@@ -675,6 +707,10 @@ def _drop_leading_preamble_sentence(line: str) -> str:
         if len(parts) == 2:
             line = parts[1].strip()
             continue
+        parts_colon = re.split(r":\s+", line, maxsplit=1)
+        if len(parts_colon) == 2 and _is_preamble(parts_colon[0]):
+            line = parts_colon[1].strip()
+            continue
         # Whole line is just a preamble — drop it.
         return ""
     return line
@@ -683,13 +719,15 @@ def _drop_leading_preamble_sentence(line: str) -> str:
 def _enforce_bullet_format(text: str, user_message: str) -> str:
     """Post-process the model output so the UI always sees tight bullets.
 
-    - Strips preambles, markdown headings, bold, and numeric lists.
+    - Strips conversational preambles, markdown headings, bold, and numeric lists.
     - Splits inline numbered lists ("1. X. 2. Y.") into separate bullets.
-    - Enforces the word budget: <=20 words for easy, <=40 for complex.
+    - Enforces relaxed word budget: <=80 words for simple, <=120 for complex questions.
+    - Falls back to formatted raw LLM text if post-processing yields empty bullets.
     """
     import re
 
-    if not text:
+    if not text or not text.strip():
+        logger.warning("[Coach Chat] Received empty text from LLM")
         return "- (no response)"
 
     # Detect complexity from the user's message (rough heuristic).
@@ -700,8 +738,8 @@ def _enforce_bullet_format(text: str, user_message: str) -> str:
         or " and " in low_q
         or any(k in low_q for k in ("how", "why", "explain", "strategy", "plan", "improve", "fix"))
     )
-    budget = 40 if is_complex else 20
-    max_bullets = 4 if is_complex else 2
+    budget = 120 if is_complex else 80
+    max_bullets = 6 if is_complex else 4
 
     cleaned = text.replace("\r", "").strip()
     # Strip markdown bold/italics/headings globally.
@@ -727,8 +765,7 @@ def _enforce_bullet_format(text: str, user_message: str) -> str:
             ln = ln[m.end():].strip()
         # Trailing colon headings like "Here are tips:" become empty after strip.
         ln = ln.rstrip(":").strip("*_ ").strip()
-        # Drop preamble sentences (e.g. "Great question. Your weakest area is X"
-        # keeps only the substantive second sentence).
+        # Drop preamble sentences
         ln = _drop_leading_preamble_sentence(ln)
         if ln:
             bullets.append(ln)
@@ -743,18 +780,32 @@ def _enforce_bullet_format(text: str, user_message: str) -> str:
     # Cap bullet count.
     bullets = bullets[:max_bullets]
 
-    # Enforce word budget by trimming from the tail.
+    # Enforce word budget by trimming from the tail, preserving at least 1 bullet
     def _words(bs: list) -> int:
         return sum(len(b.split()) for b in bs)
 
-    while bullets and _words(bullets) > budget:
+    while len(bullets) > 1 and _words(bullets) > budget:
         last = bullets[-1].split()
-        if len(last) <= 2:
+        if len(last) <= 3:
             bullets.pop()
         else:
-            bullets[-1] = " ".join(last[:-1])
+            bullets[-1] = " ".join(last[:-2])
+
+    # If a single bullet still exceeds budget significantly, trim words cleanly
+    if bullets and _words(bullets) > budget + 25:
+        words = bullets[0].split()
+        bullets[0] = " ".join(words[:budget])
+
+    # Clean up empty bullets
+    bullets = [b.rstrip('.').strip() for b in bullets if b and b.strip()]
 
     if not bullets:
-        return "- (no response)"
+        logger.warning("[Coach Chat] Post-processing emptied bullets; falling back to raw LLM text")
+        print("[Coach Chat] [!] Post-processing emptied bullets; falling back to raw LLM text")
+        raw_lines = [l.strip(" -*•·").rstrip(".") for l in text.replace("\r", "").split("\n") if l.strip()]
+        if raw_lines:
+            return "\n".join(f"- {l}" for l in raw_lines[:max_bullets])
+        cleaned_raw = text.strip().replace("\r", "").replace("\n", " ")
+        return f"- {cleaned_raw}"
 
-    return "\n".join(f"- {b.rstrip('.').strip()}" for b in bullets)
+    return "\n".join(f"- {b}" for b in bullets)

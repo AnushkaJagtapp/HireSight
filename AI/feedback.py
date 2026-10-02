@@ -9,6 +9,12 @@ import json
 from dataclasses import dataclass
 from typing import List, Dict
 from groq import Groq
+try:
+    from model_config import get_groq_model
+except ImportError:
+    def get_groq_model() -> str:
+        return os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+
 from rule_engine import RuleAnalysis
 from evaluator import EvalResult
 
@@ -158,24 +164,23 @@ PRE-COMPUTED SCORE: {overall_score}/100 (Grade: {grade})
 Generate brutally honest, specific, transcript-quoted feedback now.
 """
 
-    print("[feedback] Generating coach debrief via Llama 3.3 70B...")
-
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": FEEDBACK_SYSTEM_PROMPT},
-            {"role": "user", "content": context},
-        ],
-        temperature=0.4,
-        max_tokens=2000,
-        response_format={"type": "json_object"},
-    )
-
-    raw = response.choices[0].message.content.strip()
+    print(f"[feedback] Generating coach debrief via {get_groq_model()}...")
 
     try:
+        response = client.chat.completions.create(
+            model=get_groq_model(),
+            messages=[
+                {"role": "system", "content": FEEDBACK_SYSTEM_PROMPT},
+                {"role": "user", "content": context},
+            ],
+            temperature=0.4,
+            max_tokens=3000,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
         data = json.loads(raw)
-    except json.JSONDecodeError:
+    except Exception as e:
+        print(f"[feedback] ⚠ Feedback generation failed ({e}), using fallback")
         data = {
             "overall_score": overall_score,
             "grade": grade,

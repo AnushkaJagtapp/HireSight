@@ -18,6 +18,11 @@ import re
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 from groq import Groq
+try:
+    from model_config import get_groq_model
+except ImportError:
+    def get_groq_model() -> str:
+        return os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 
 
 @dataclass
@@ -226,26 +231,24 @@ def diarize(transcript: str, job_description: str = None,
     if len(user_content) > max_chars:
         user_content = user_content[:max_chars] + "\n\n[TRANSCRIPT TRUNCATED — analyze what is provided]"
 
-    print("[diarizer] Analyzing speaker roles via Llama 3.3 70B...")
-
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content},
-        ],
-        temperature=0.15,
-        max_tokens=4000,
-        response_format={"type": "json_object"},
-    )
-
-    raw = response.choices[0].message.content.strip()
+    print(f"[diarizer] Analyzing speaker roles via {get_groq_model()}...")
 
     try:
+        response = client.chat.completions.create(
+            model=get_groq_model(),
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.15,
+            max_tokens=8192,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
         data = json.loads(raw)
-    except json.JSONDecodeError:
+    except Exception as e:
         # Fallback: treat entire transcript as candidate speech
-        print("[diarizer] ⚠ Could not parse AI response, treating all as candidate speech")
+        print(f"[diarizer] ⚠ AI diarization failed ({e}), treating all as candidate speech")
         return DiarizationResult(
             turns=[SpeakerTurn("candidate", transcript, 0.0, 0.0, 0.5)],
             candidate_text=transcript,
@@ -301,8 +304,10 @@ def diarize(transcript: str, job_description: str = None,
 
         current_time = end_time + 0.5  # small gap between turns
 
-    candidate_text = " ".join(candidate_parts)
-    interviewer_text = " ".join(interviewer_parts)
+    candidate_text = " ".join(candidate_parts).strip()
+    interviewer_text = " ".join(interviewer_parts).strip()
+    if not candidate_text:
+        candidate_text = transcript.strip()
 
     questions = data.get("questions_detected", [])
 

@@ -7,12 +7,13 @@ import contextlib
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks, Request
 
 from ..firebase import get_db, upload_file, download_file, delete_file
 from ..security import get_current_user
 from ..config import settings
 from ..services.ai_service import run_pipeline, generate_coach_tips
+from ..limiter import limiter
 
 router = APIRouter(prefix="/api/interviews", tags=["interviews"])
 
@@ -103,7 +104,9 @@ def _evaluate_and_save(interview_id: str, user_id: str, local_path: str,
 
 
 @router.post("/")
+@limiter.limit("10/minute")
 async def submit_interview(
+    request: Request,
     background: BackgroundTasks,
     file: Optional[UploadFile] = File(None),
     transcript_text: Optional[str] = Form(None),
