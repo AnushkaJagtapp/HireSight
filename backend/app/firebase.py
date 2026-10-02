@@ -64,7 +64,7 @@ def get_db():
 def upload_file(local_path: str, dest_folder: str = "uploads") -> str:
     """Upload a private file and return a Firebase Storage URI."""
     if _bucket is None:
-        if settings.is_production:
+        if settings.is_production and not settings.USE_LOCAL_DB:
             raise RuntimeError("Firebase Storage is required in production")
         return local_path
     ext = os.path.splitext(local_path)[1]

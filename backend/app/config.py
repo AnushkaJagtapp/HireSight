@@ -37,14 +37,13 @@ class Settings(BaseSettings):
             missing.append("SECRET_KEY (must be strong and at least 32 characters)")
         if not self.GROQ_API_KEY:
             missing.append("GROQ_API_KEY")
-        if not self.FIREBASE_CREDENTIALS_JSON:
-            missing.append("FIREBASE_CREDENTIALS_JSON")
-        if not self.FIREBASE_STORAGE_BUCKET:
-            missing.append("FIREBASE_STORAGE_BUCKET")
-        if self.USE_LOCAL_DB:
-            missing.append("USE_LOCAL_DB must be false")
-        if not self.FRONTEND_ORIGIN.startswith("https://"):
-            missing.append("FRONTEND_ORIGIN must use https://")
+        if not self.USE_LOCAL_DB:
+            if not self.FIREBASE_CREDENTIALS_JSON:
+                missing.append("FIREBASE_CREDENTIALS_JSON")
+            if not self.FIREBASE_STORAGE_BUCKET:
+                missing.append("FIREBASE_STORAGE_BUCKET")
+        if not (self.FRONTEND_ORIGIN.startswith("https://") or self.FRONTEND_ORIGIN.startswith("http://")):
+            missing.append("FRONTEND_ORIGIN must start with https:// or http://")
         if missing:
             raise RuntimeError(
                 "Invalid production configuration: " + "; ".join(missing)
