@@ -70,7 +70,7 @@ a Render Blueprint.
 1. Sign in to [Render](https://dashboard.render.com/).
 2. Select **New > Blueprint**.
 3. Connect the GitHub repository:
-   `https://github.com/iam-ankur01/Hackathon`
+   `https://github.com/AnushkaJagtapp/HireSight`
 4. Select the `main` branch.
 5. Render should detect the root-level `render.yaml`.
 6. Confirm creation of the `hiresight-api` web service.
