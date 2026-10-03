@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// In Vercel multi-service deployment, /api rewrites route directly to the backend service.
+// In standalone Vite dev, vite.config.js proxies /api to http://127.0.0.1:8000.
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const api = axios.create({ baseURL: API_BASE });
 

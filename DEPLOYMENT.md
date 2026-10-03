@@ -1,14 +1,19 @@
 # HireSight Deployment Guide
 
-This project is deployed as two services:
+This project can be deployed in two ways:
 
-- **Backend and AI pipeline:** Render (Docker)
-- **Frontend:** Vercel (Vite)
-- **Database and file storage:** Firebase
-- **AI APIs:** Groq
+1. **Vercel Multi-Service Project (Unified Single Deployment):**
+   - Configured via root `vercel.json` with three services:
+     - `frontend`: Vite React UI (Public on `/(.*)`)
+     - `backend`: FastAPI API (Public on `/api/(.*)`, `/health`, `/ready`, `/docs`)
+     - `ai`: Internal FastAPI AI analysis service (Private, accessed via `AI_SERVICE_URL` binding)
+   - Shared unified domain with automatic internal service routing and no CORS configuration needed.
 
-The `AI/` directory does not need a separate deployment. Render includes it
-inside the backend Docker image.
+2. **Hybrid Deployment (Render + Vercel):**
+   - **Backend and AI pipeline:** Render (Docker)
+   - **Frontend:** Vercel (Vite)
+   - **Database and file storage:** Firebase (or local JSON mode)
+   - **AI APIs:** Groq
 
 ## 1. Prepare the repository
 

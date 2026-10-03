@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     FRONTEND_ORIGIN: str = "http://localhost:5173"
     UPLOAD_DIR: str = "./uploads"
+    AI_SERVICE_URL: str = ""
 
     @property
     def is_production(self) -> bool:

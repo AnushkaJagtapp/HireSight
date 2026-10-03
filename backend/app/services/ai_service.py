@@ -201,6 +201,53 @@ def _local_fallback_report(transcript_text: Optional[str], job_description: str,
     }
 
 
+def _call_remote_ai_service(
+    ai_url: str,
+    interview_path: str,
+    job_description: str = "",
+    job_title: str = "",
+    company_name: str = "",
+    resume_path: Optional[str] = None,
+    github_url: Optional[str] = None,
+    linkedin_url: Optional[str] = None,
+    transcript_text: Optional[str] = None,
+) -> dict:
+    """Invoke the internal AI service via HTTP using the bound service URL."""
+    import httpx
+
+    endpoint = f"{ai_url.rstrip('/')}/evaluate"
+    data = {
+        "job_description": job_description or "",
+        "job_title": job_title or "",
+        "company_name": company_name or "",
+        "transcript_text": transcript_text or "",
+        "github_url": github_url or "",
+        "linkedin_url": linkedin_url or "",
+    }
+    files = {}
+    opened_files = []
+    try:
+        if interview_path and os.path.exists(interview_path):
+            f_interview = open(interview_path, "rb")
+            opened_files.append(f_interview)
+            files["file"] = (os.path.basename(interview_path), f_interview)
+        if resume_path and os.path.exists(resume_path):
+            f_resume = open(resume_path, "rb")
+            opened_files.append(f_resume)
+            files["resume_file"] = (os.path.basename(resume_path), f_resume)
+
+        with httpx.Client(timeout=180.0) as client:
+            resp = client.post(endpoint, data=data, files=files if files else None)
+            resp.raise_for_status()
+            return resp.json()
+    finally:
+        for f in opened_files:
+            try:
+                f.close()
+            except Exception:
+                pass
+
+
 def run_pipeline(
     interview_path: str,
     job_description: str = "",
@@ -213,20 +260,36 @@ def run_pipeline(
 ) -> dict:
     """Run the full evaluation pipeline and return a serializable report dict."""
     _sync_env_keys()
-    from pipeline_v2 import evaluate_interview  # lazy import
+    ai_service_url = (os.environ.get("AI_SERVICE_URL") or getattr(settings, "AI_SERVICE_URL", "")).strip()
 
     try:
-        report = evaluate_interview(
-            interview_path=interview_path,
-            job_description=job_description,
-            job_title=job_title,
-            company_name=company_name,
-            resume_path=resume_path,
-            github_url=github_url,
-            linkedin_url=linkedin_url,
-            transcript_text=transcript_text,
-        )
-        result = report.to_dict()
+        if ai_service_url:
+            print(f"[ai_service] Calling internal AI service via binding at: {ai_service_url}")
+            result = _call_remote_ai_service(
+                ai_url=ai_service_url,
+                interview_path=interview_path,
+                job_description=job_description,
+                job_title=job_title,
+                company_name=company_name,
+                resume_path=resume_path,
+                github_url=github_url,
+                linkedin_url=linkedin_url,
+                transcript_text=transcript_text,
+            )
+        else:
+            from pipeline_v2 import evaluate_interview  # lazy import
+            report = evaluate_interview(
+                interview_path=interview_path,
+                job_description=job_description,
+                job_title=job_title,
+                company_name=company_name,
+                resume_path=resume_path,
+                github_url=github_url,
+                linkedin_url=linkedin_url,
+                transcript_text=transcript_text,
+            )
+            result = report.to_dict()
+
         _validate_interview_transcript(
             (result.get("metadata") or {}).get("full_transcript", "")
         )
