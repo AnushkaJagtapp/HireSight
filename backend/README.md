@@ -1,7 +1,7 @@
 # Interview Evaluator — Backend
 
 FastAPI backend that wraps the AI interview-evaluation pipeline and stores users,
-profiles, and scored reports in **Firebase Firestore**.
+profiles, and scored reports with a lightweight, zero-config JSON database and local file storage.
 
 ## Quick start
 
@@ -11,10 +11,7 @@ python -m venv .venv && source .venv/bin/activate   # win: .venv\Scripts\activat
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env → fill in GROQ_API_KEY and FIREBASE_CREDENTIALS path
-
-# Put your Firebase service-account JSON at the path from FIREBASE_CREDENTIALS
-# (download from Firebase Console → Project Settings → Service Accounts → Generate Key)
+# edit .env → fill in GROQ_API_KEY
 
 python run.py
 # API at http://localhost:8000, docs at http://localhost:8000/docs
@@ -58,7 +55,7 @@ The same Groq Llama model also powers the dynamic roadmap generator
 (`/api/roadmap`) and the AI Coach chat (`/api/coach/chat`), both grounded
 strictly in the latest interview report.
 
-## Firestore collections
+## Database collections
 
 - `users/{userId}` — auth + profile fields
 - `interviews/{interviewId}` — one doc per submission, `user_id` field scopes access
@@ -71,7 +68,8 @@ backend/
 ├── app/
 │   ├── main.py            # FastAPI app, CORS, router mount
 │   ├── config.py          # .env-driven Settings
-│   ├── firebase.py        # firebase-admin init + helpers
+│   ├── db.py              # database initialization + storage helpers
+│   ├── local_db.py        # local JSON document database
 │   ├── security.py        # bcrypt + JWT + get_current_user dep
 │   ├── schemas.py         # Pydantic models
 │   ├── routes/

@@ -18,7 +18,4 @@ services:
         sync: false
       - key: FRONTEND_ORIGIN
         sync: false
-      - key: FIREBASE_CREDENTIALS_JSON
-        sync: false
-      - key: FIREBASE_STORAGE_BUCKET
-        sync: false
+

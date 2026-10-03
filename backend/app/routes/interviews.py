@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks, Request
 
-from ..firebase import get_db, upload_file, download_file, delete_file
+from ..db import get_db, upload_file, download_file, delete_file
 from ..security import get_current_user
 from ..config import settings
 from ..services.ai_service import run_pipeline, generate_coach_tips

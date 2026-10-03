@@ -28,10 +28,10 @@
 | **P3** | FE-006 | Hide/fix Profile quick links when GitHub/LinkedIn URLs empty | Frontend | ⏳ Pending | |
 | **P3** | FE-007 | Replace hardcoded marketing stats on Home page or label illustrative | Frontend | ⏳ Pending | |
 | **P3** | FE-008 | Fix Recharts tooltip styling for light theme | Frontend | ⏳ Pending | |
-| **P3** | BE-002 | Update deprecated Firestore positional filter arguments | Backend | ⏳ Pending | |
+| **P3** | BE-002 | Update deprecated Firestore positional filter arguments | Backend | ✅ Completed | Fully replaced Firestore with zero-config LocalDB |
 | **P3** | BE-003 | Add pagination to history/interviews endpoints | Backend | ⏳ Pending | |
 | **P3** | BE-004 | Review Windows UTF-8 encoding workaround in `interviews.py` | Backend | ⏳ Pending | |
-| **P3** | BE-005 | Review local file upload storage when no Firebase bucket configured | Backend | ⏳ Pending | |
+| **P3** | BE-005 | Review local file upload storage when no Firebase bucket configured | Backend | ✅ Completed | Local persistent file storage adopted as primary standalone storage |
 | **P4** | FEAT-001 | Question-wise analysis (detection, segmentation, per-question scoring) | AI/Backend | ⏳ Pending | Est. 1-2 weeks |
 | **P4** | FEAT-002 | Recruiter role & dashboard | Fullstack | ⏳ Pending | Est. 3-4 weeks |
 | **P4** | FEAT-003 | Candidate comparison & ranking | Fullstack | ⏳ Pending | Est. 2-3 weeks |

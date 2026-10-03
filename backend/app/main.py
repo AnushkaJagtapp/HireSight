@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .config import settings
 from .limiter import limiter
-from .firebase import init_firebase
+from .db import init_db
 from .routes import auth, users, interviews, jobs, progress, history
 
 app = FastAPI(
@@ -59,10 +59,10 @@ app.add_middleware(
 def _startup():
     settings.validate_production()
     try:
-        init_firebase()
-        print("[startup] Firebase initialized.")
+        init_db()
+        print("[startup] Local database initialized.")
     except Exception as e:
-        print(f"[startup] Firebase init failed: {e}")
+        print(f"[startup] Database init failed: {e}")
         if settings.is_production:
             raise
 
@@ -79,7 +79,7 @@ def health():
 
 @app.get("/ready")
 def ready():
-    from .firebase import get_db
+    from .db import get_db
 
     list(get_db().collection("_health").limit(1).stream())
     return {"status": "ready"}

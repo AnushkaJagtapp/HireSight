@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
-from ..firebase import get_db
+from ..db import get_db
 from ..security import get_current_user
 from ..services.ai_service import generate_roadmap, coach_chat
 

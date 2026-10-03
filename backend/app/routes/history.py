@@ -1,14 +1,14 @@
 """History routes — per-user upload/record history with transcripts.
 
 Every submission to POST /api/interviews/ automatically creates a history
-entry (same Firestore document). These endpoints expose a simplified,
+entry (same database document). These endpoints expose a simplified,
 history-shaped view of those documents so the frontend can list, search,
 preview, and delete them without leaking the full scoring report.
 """
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..firebase import get_db, delete_file
+from ..db import get_db, delete_file
 from ..security import get_current_user
 
 router = APIRouter(prefix="/api/history", tags=["history"])

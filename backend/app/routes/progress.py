@@ -2,7 +2,7 @@
 from collections import defaultdict
 from fastapi import APIRouter, Depends
 
-from ..firebase import get_db
+from ..db import get_db
 from ..security import get_current_user
 
 router = APIRouter(prefix="/api", tags=["progress"])

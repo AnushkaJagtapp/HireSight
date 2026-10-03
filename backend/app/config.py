@@ -12,10 +12,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "openai/gpt-oss-120b"
 
-    FIREBASE_CREDENTIALS: str = "./firebase-service-account.json"
-    FIREBASE_CREDENTIALS_JSON: str = ""
-    FIREBASE_STORAGE_BUCKET: str = ""
-    USE_LOCAL_DB: bool = False
+    USE_LOCAL_DB: bool = True
     LOCAL_DB_PATH: str = "./local_data.json"
 
     FRONTEND_ORIGIN: str = "http://localhost:5173"
@@ -39,11 +36,6 @@ class Settings(BaseSettings):
             missing.append("SECRET_KEY (must be strong and at least 32 characters)")
         if not self.GROQ_API_KEY:
             missing.append("GROQ_API_KEY")
-        if not self.USE_LOCAL_DB:
-            if not self.FIREBASE_CREDENTIALS_JSON:
-                missing.append("FIREBASE_CREDENTIALS_JSON")
-            if not self.FIREBASE_STORAGE_BUCKET:
-                missing.append("FIREBASE_STORAGE_BUCKET")
         if not (self.FRONTEND_ORIGIN.startswith("https://") or self.FRONTEND_ORIGIN.startswith("http://")):
             missing.append("FRONTEND_ORIGIN must start with https:// or http://")
         if missing:

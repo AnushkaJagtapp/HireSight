@@ -3,7 +3,7 @@ import os
 import uuid
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 
-from ..firebase import get_db, upload_file, delete_file
+from ..db import get_db, upload_file, delete_file
 from ..schemas import ProfileUpdate
 from ..security import get_current_user
 from ..config import settings

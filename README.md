@@ -14,7 +14,7 @@ AI-assisted interview evaluation platform with interactive speech cadence analys
 cd backend
 pip install -r requirements.txt
 Copy-Item .env.example .env
-# Fill in local values. USE_LOCAL_DB=true works without Firebase.
+# Fill in local values (e.g. GROQ_API_KEY).
 python run.py
 ```
 
@@ -47,7 +47,7 @@ python -m compileall -q app
 ## Deployment
 
 The recommended deployment is Vercel for the frontend and a Docker-based
-Render service for the backend, with Firestore and private Firebase Storage.
+Render service for the backend, with standalone zero-config storage.
 See [DEPLOYMENT.md](DEPLOYMENT.md) for the full checklist.
 
-Never commit `.env` files or Firebase service-account JSON files.
+Never commit `.env` or sensitive secret files.

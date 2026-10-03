@@ -1,4 +1,4 @@
-"""Small persistent Firestore-compatible store for local development."""
+"""Lightweight persistent document database store."""
 from __future__ import annotations
 
 import json
